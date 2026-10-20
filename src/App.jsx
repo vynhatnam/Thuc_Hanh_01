@@ -1,122 +1,89 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
+import { Routes, Route, NavLink, Link } from "react-router";
 
+// Trang chủ
+function Home() {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
+    <main className="home">
+      <section className="hero">
+        <div className="hero-content">
+          <p>CHĂM SÓC SỨC KHỎE THÔNG MINH</p>
+
+          <h1>
+            Đúng bác sĩ.
+            <br />
+            Đúng thời điểm.
+          </h1>
+
           <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
+            Tìm bác sĩ phù hợp, chọn lịch khám linh hoạt
+            và chủ động chăm sóc sức khỏe của bạn cùng SunCare.
           </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+          <Link to="/booking">Đặt lịch ngay</Link>
+          {" "}
+          <Link to="/doctors">Tìm bác sĩ →</Link>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
+
+        <div className="hero-card">
+          <h2>Sức khỏe của bạn là ưu tiên của chúng tôi.</h2>
+          <p>Đặt lịch nhanh chóng, an tâm trong từng lần khám.</p>
         </div>
       </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    </main>
+  );
 }
 
-export default App
+// Component trang tạm thời
+function Page({ title }) {
+  return (
+    <main style={{ padding: "60px" }}>
+      <h1>{title}</h1>
+      <p>Chào mừng bạn đến với SunCare.</p>
+    </main>
+  );
+}
+
+function App() {
+  return (
+    <>
+      {/* Thanh menu */}
+      <header className="header">
+        <Link to="/" className="logo">
+          SunCare
+        </Link>
+
+        <nav className="nav">
+          <NavLink to="/" end>Trang chủ</NavLink>
+          <NavLink to="/specialties">Chuyên khoa</NavLink>
+          <NavLink to="/doctors">Bác sĩ</NavLink>
+          <NavLink to="/about-us">Giới thiệu</NavLink>
+          <NavLink to="/faq">FAQ</NavLink>
+          <NavLink to="/contact">Liên hệ</NavLink>
+        </nav>
+
+        <div className="header-actions">
+          <Link to="/booking">Đặt lịch ngay</Link>
+          <Link to="/login">Đăng nhập</Link>
+          <Link to="/register">Đăng ký</Link>
+        </div>
+      </header>
+
+      {/* Cấu hình các trang */}
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/specialties" element={<Page title="Chuyên khoa" />} />
+        <Route path="/doctors" element={<Page title="Bác sĩ" />} />
+        <Route path="/about-us" element={<Page title="Giới thiệu" />} />
+        <Route path="/faq" element={<Page title="Câu hỏi thường gặp" />} />
+        <Route path="/contact" element={<Page title="Liên hệ" />} />
+        <Route path="/booking" element={<Page title="Đặt lịch khám" />} />
+        <Route path="/login" element={<Page title="Đăng nhập" />} />
+        <Route path="/register" element={<Page title="Đăng ký" />} />
+        <Route path="*" element={<Page title="404 - Không tìm thấy trang" />} />
+      </Routes>
+    </>
+  );
+}
+
+export default App;
