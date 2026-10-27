@@ -1,5 +1,6 @@
 
 import { Routes, Route, NavLink, Link } from "react-router";
+import DoctorsPage from "./pages/DoctorsPage";
 
 // Trang chủ
 function Home() {
@@ -73,7 +74,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/specialties" element={<Page title="Chuyên khoa" />} />
-        <Route path="/doctors" element={<Page title="Bác sĩ" />} />
+        <Route path="/doctors" element={<DoctorsPage />} />
         <Route path="/about-us" element={<Page title="Giới thiệu" />} />
         <Route path="/faq" element={<Page title="Câu hỏi thường gặp" />} />
         <Route path="/contact" element={<Page title="Liên hệ" />} />

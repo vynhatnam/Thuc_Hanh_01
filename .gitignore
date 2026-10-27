@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# ASP.NET Core build output and local SQLite data
+**/bin/
+**/obj/
+backend/SunCareApi/App_Data/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

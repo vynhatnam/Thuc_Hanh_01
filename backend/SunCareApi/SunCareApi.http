@@ -1,0 +1,44 @@
+@SunCareApi_HostAddress = http://localhost:5275
+@doctorId = 1
+
+### GET: Lấy danh sách bác sĩ
+GET {{SunCareApi_HostAddress}}/api/doctors
+Accept: application/json
+
+### GET: Lấy bác sĩ theo mã
+GET {{SunCareApi_HostAddress}}/api/doctors/{{doctorId}}
+Accept: application/json
+
+### POST: Tạo bác sĩ (201 Created, Location chứa URL chi tiết)
+POST {{SunCareApi_HostAddress}}/api/doctors
+Content-Type: application/json
+
+{
+  "name": "Lê Minh Châu",
+  "specialty": "Da liễu"
+}
+
+### PUT: Thay doctorId bằng id trả về từ POST để cập nhật bác sĩ vừa tạo
+PUT {{SunCareApi_HostAddress}}/api/doctors/{{doctorId}}
+Content-Type: application/json
+
+{
+  "name": "Lê Minh Châu",
+  "specialty": "Nội khoa"
+}
+
+### DELETE: Xóa bác sĩ (204 No Content)
+DELETE {{SunCareApi_HostAddress}}/api/doctors/{{doctorId}}
+
+### POST: Kiểm tra dữ liệu sai (400 ValidationProblemDetails)
+POST {{SunCareApi_HostAddress}}/api/doctors
+Content-Type: application/json
+
+{
+  "name": "   ",
+  "specialty": "Tim mạch"
+}
+
+### GET: Bác sĩ không tồn tại (404 ProblemDetails)
+GET {{SunCareApi_HostAddress}}/api/doctors/2147483647
+Accept: application/json

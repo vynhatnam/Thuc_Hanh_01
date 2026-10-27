@@ -5,11 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "dotnet run --project backend/SunCareApi/SunCareApi.csproj --configuration Release --launch-profile http",
     "build": "vite build",
+    "build:api": "dotnet build backend/SunCareApi/SunCareApi.csproj --configuration Release",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:api": "npm run build:api && node scripts/smoke-api.mjs"
   },
   "dependencies": {
+    "axios": "^1.21.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-router": "^8.5.0"
