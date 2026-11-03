@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as delay } from 'node:timers/promises';
+import { DatabaseSync } from 'node:sqlite';
 
 // Run after building the API. Each run owns a temporary database and API process.
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -20,6 +21,13 @@ let apiProcess;
 let apiOutput = '';
 let baseUrl;
 let passed = 0;
+let sessionToken;
+
+function withDatabase(action) {
+  const database = new DatabaseSync(path.join(temporaryDirectory, 'smoke.db'));
+  try { return action(database); }
+  finally { database.close(); }
+}
 
 async function availablePort() {
   const server = createServer();
@@ -88,7 +96,10 @@ async function stopApi() {
 async function request(method, route, body, extraHeaders = {}) {
   return fetch(`${baseUrl}${route}`, {
     method,
-    headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...extraHeaders },
+    headers: {
+      ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...extraHeaders,
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(10000),
   });
@@ -113,13 +124,86 @@ try {
     throw new Error(`Build the backend first: dotnet build backend/SunCareApi/SunCareApi.csproj --configuration ${apiConfiguration}`);
   });
   temporaryDirectory = await mkdtemp(temporaryPrefix);
+  // Start from the previous exercise's exact schema, rather than only testing a fresh DB.
+  withDatabase((database) => {
+    database.exec(`CREATE TABLE "Doctors" (
+      "Id" INTEGER NOT NULL CONSTRAINT "PK_Doctors" PRIMARY KEY AUTOINCREMENT,
+      "Name" TEXT NOT NULL, "Specialty" TEXT NOT NULL);`);
+    database.prepare('INSERT INTO Doctors (Id, Name, Specialty) VALUES (?, ?, ?)')
+      .run(42, 'Bác sĩ từ bài tập 2', 'Nội khoa');
+  });
   await startApi();
 
   const initialResponse = await request('GET', '/api/doctors');
   assert.equal(initialResponse.status, 200);
   const initialDoctors = await initialResponse.json();
   assert.ok(Array.isArray(initialDoctors));
-  check('GET returns the doctors collection');
+  assert.deepEqual(initialDoctors, [{ id: 42, name: 'Bác sĩ từ bài tập 2', specialty: 'Nội khoa' }]);
+  check('Database migration preserves the previous exercise doctors and IDs');
+
+  await expectProblem(await request('GET', '/api/auth/me'), 401);
+  for (const [method, route, body] of [
+    ['POST', '/api/doctors', { name: 'Guest', specialty: 'Test' }],
+    ['PUT', '/api/doctors/42', { name: 'Guest', specialty: 'Test' }],
+    ['DELETE', '/api/doctors/42'],
+  ]) await expectProblem(await request(method, route, body), 401);
+  check('Anonymous users can read doctors but cannot modify data or read /auth/me');
+
+  for (const body of [
+    {}, { email: 'invalid-email', password: 'Password123!' },
+    { email: 'test@example.com', password: 'short' },
+    { email: 'test@example.com', password: '         ' },
+    { email: 'test@example.com', password: 'a'.repeat(129) },
+    { email: null, password: 'Password123!' },
+    { email: 'test@example.com', password: null },
+    { email: `${'a'.repeat(250)}@example.com`, password: 'Password123!' },
+  ]) await expectProblem(await request('POST', '/api/auth/register', body), 400);
+  check('Registration validates required fields, email format and password limits');
+
+  const credentials = { email: '  Member@Example.com  ', password: 'Password123!' };
+  const registration = await request('POST', '/api/auth/register', credentials);
+  assert.equal(registration.status, 201);
+  const registeredUser = await registration.json();
+  assert.equal(registeredUser.email, 'Member@Example.com');
+  assert.ok(Number.isInteger(registeredUser.id));
+  assert.deepEqual(Object.keys(registeredUser).sort(), ['createdAt', 'email', 'id']);
+  withDatabase((database) => {
+    const storedUser = database.prepare('SELECT * FROM Users WHERE Id = ?').get(registeredUser.id);
+    assert.notEqual(storedUser.PasswordHash, credentials.password);
+    assert.ok(storedUser.PasswordHash.length > 60);
+    assert.equal(storedUser.NormalizedEmail, 'MEMBER@EXAMPLE.COM');
+  });
+  await expectProblem(await request('POST', '/api/auth/register', {
+    email: 'member@example.com', password: 'OtherPassword123!',
+  }), 409);
+  const concurrent = await Promise.all([0, 1].map(() => request('POST', '/api/auth/register', {
+    email: 'race@example.com', password: 'Password123!',
+  })));
+  assert.deepEqual(concurrent.map((response) => response.status).sort(), [201, 409]);
+  check('Registration stores a password hash, never returns it and rejects duplicate emails');
+
+  for (const email of ['member@example.com', 'unknown@example.com']) {
+    await expectProblem(await request('POST', '/api/auth/login', { email, password: 'WrongPassword123!' }), 401);
+  }
+  const loginResponse = await request('POST', '/api/auth/login', {
+    email: ' member@EXAMPLE.com ', password: credentials.password,
+  });
+  assert.equal(loginResponse.status, 200);
+  const login = await loginResponse.json();
+  assert.deepEqual(login.user, registeredUser);
+  assert.match(login.token, /^[a-f\d]{64}$/i);
+  assert.ok(Date.parse(login.expiresAt) > Date.now());
+  sessionToken = login.token;
+  const meResponse = await request('GET', '/api/auth/me');
+  assert.equal(meResponse.status, 200);
+  assert.deepEqual(await meResponse.json(), registeredUser);
+  withDatabase((database) => {
+    const storedSession = database.prepare('SELECT * FROM AuthSessions WHERE UserId = ?').get(registeredUser.id);
+    assert.notEqual(storedSession.TokenHash, sessionToken);
+    assert.equal(storedSession.TokenHash.length, 64);
+  });
+  await expectProblem(await request('GET', '/api/auth/me', undefined, { Authorization: `Bearer ${'a'.repeat(64)}` }), 401);
+  check('Login queries saved users, verifies passwords and returns a verifiable opaque session');
 
   for (const body of [
     {},
@@ -190,6 +274,7 @@ try {
 
   await stopApi();
   await startApi();
+  assert.deepEqual(await (await request('GET', '/api/auth/me')).json(), registeredUser);
   const persistedResponse = await request('GET', doctorRoute);
   assert.equal(persistedResponse.status, 200);
   assert.deepEqual(await persistedResponse.json(), updatedDoctor);
@@ -210,6 +295,35 @@ try {
   await expectProblem(await request('GET', doctorRoute), 404);
   assert.equal((await (await request('GET', '/api/doctors')).json()).length, initialDoctors.length);
   check('Deleted data stays deleted after another restart');
+
+  assert.equal((await request('POST', '/api/auth/logout')).status, 204);
+  await expectProblem(await request('GET', '/api/auth/me'), 401);
+  await expectProblem(await request('POST', '/api/doctors', { name: 'Old session', specialty: 'Test' }), 401);
+  check('Logout revokes the session in the database and rejects reuse of the token');
+
+  const nextLogin = await request('POST', '/api/auth/login', {
+    email: 'member@example.com', password: credentials.password,
+  });
+  assert.equal(nextLogin.status, 200);
+  sessionToken = (await nextLogin.json()).token;
+  withDatabase((database) => database.exec("UPDATE AuthSessions SET ExpiresAtUtc = '2000-01-01 00:00:00'"));
+  await expectProblem(await request('GET', '/api/auth/me'), 401);
+  check('Expired sessions are rejected by the API');
+
+  // A new database must also work (including migration snapshot validation).
+  await stopApi();
+  withDatabase((database) => {
+    for (const table of ['AuthSessions', 'Users', 'Doctors', '__EFMigrationsHistory', '__EFMigrationsLock'])
+      database.exec(`DROP TABLE IF EXISTS "${table}"`);
+  });
+  sessionToken = undefined;
+  await startApi();
+  const seeded = await (await request('GET', '/api/doctors')).json();
+  assert.equal(seeded.length, 2);
+  assert.equal((await request('POST', '/api/auth/register', {
+    email: 'fresh@example.com', password: 'Password123!',
+  })).status, 201);
+  check('A fresh database creates all tables, seeds doctors and accepts registration');
 
   console.log(`\nAPI smoke test: ${passed} checks passed.`);
 } catch (error) {

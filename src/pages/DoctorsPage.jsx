@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link } from "react-router";
+import { useAuth } from "../auth/useAuth";
 import {
   createDoctor,
   deleteDoctor,
@@ -20,6 +22,7 @@ function validate(values) {
 }
 
 export default function DoctorsPage() {
+  const { user } = useAuth();
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [listError, setListError] = useState("");
@@ -101,7 +104,7 @@ export default function DoctorsPage() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (busy) return;
+    if (busy || !user) return;
     const errors = validate(form);
     setFormErrors(errors);
     setFormError("");
@@ -153,7 +156,7 @@ export default function DoctorsPage() {
   }
 
   async function confirmDelete() {
-    if (!deleteTarget || busy) return;
+    if (!deleteTarget || busy || !user) return;
     setDeleting(true);
     setDeleteError("");
     setNotice("");
@@ -184,7 +187,7 @@ export default function DoctorsPage() {
 
       {notice && <p className="feedback feedback-success" role="status">{notice}</p>}
 
-      {deleteTarget && (
+      {deleteTarget && user && (
         <section className="delete-confirmation" role="alertdialog" aria-labelledby="delete-title" aria-describedby="delete-description">
           <div>
             <h2 id="delete-title">Xóa bác sĩ?</h2>
@@ -219,15 +222,16 @@ export default function DoctorsPage() {
                     <td><span className="specialty-tag">{doctor.specialty}</span></td>
                     <td><div className="row-actions">
                       <button type="button" disabled={busy || !!deleteTarget} onClick={() => showDetail(doctor.id)} aria-label={`Xem ${doctor.name}`}>Xem</button>
-                      <button type="button" disabled={busy || !!deleteTarget} onClick={() => startEdit(doctor)} aria-label={`Sửa ${doctor.name}`}>Sửa</button>
-                      <button className="delete-link" type="button" disabled={busy || !!deleteTarget} onClick={() => { closeDetail(); setDeleteTarget(doctor); setDeleteError(""); }} aria-label={`Xóa ${doctor.name}`}>Xóa</button>
+                      <button type="button" disabled={!user || busy || !!deleteTarget} onClick={() => startEdit(doctor)} aria-label={`Sửa ${doctor.name}`}>Sửa</button>
+                      <button className="delete-link" type="button" disabled={!user || busy || !!deleteTarget} onClick={() => { closeDetail(); setDeleteTarget(doctor); setDeleteError(""); }} aria-label={`Xóa ${doctor.name}`}>Xóa</button>
                     </div></td>
                   </tr>)}</tbody>
                 </table></div>}
         </section>
 
         <aside className="doctor-sidebar">
-          <section className="panel doctor-form-panel" aria-labelledby="doctor-form-title">
+          {!user ? <section className="panel guest-doctor-panel"><h2>Quản lý bác sĩ</h2><p>Đăng nhập để thêm, sửa và xóa thông tin bác sĩ.</p><Link className="button button-primary" to="/login" state={{ from: "/doctors" }}>Đăng nhập</Link></section>
+            : <section className="panel doctor-form-panel" aria-labelledby="doctor-form-title">
             <div className="panel-heading"><div><p className="eyebrow">{editingId === null ? "THÊM MỚI" : `BÁC SĨ #${editingId}`}</p><h2 id="doctor-form-title">{editingId === null ? "Thêm bác sĩ" : "Chỉnh sửa bác sĩ"}</h2></div></div>
             <form className="doctor-form" onSubmit={handleSubmit} noValidate>
               <p className="form-hint">Các trường có dấu <span aria-hidden="true">*</span> là bắt buộc.</p>
@@ -247,7 +251,7 @@ export default function DoctorsPage() {
                 {editingId !== null && <button className="button button-secondary" type="button" disabled={busy} onClick={resetForm}>Hủy chỉnh sửa</button>}
               </div>
             </form>
-          </section>
+          </section>}
 
           {(detail || detailLoading || detailError) && <section className="panel doctor-detail" aria-labelledby="doctor-detail-title" aria-busy={detailLoading}>
             <div className="panel-heading"><h2 id="doctor-detail-title">Chi tiết bác sĩ</h2><button className="close-button" type="button" aria-label="Đóng chi tiết" onClick={closeDetail}>×</button></div>

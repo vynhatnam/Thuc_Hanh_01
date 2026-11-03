@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using SunCareApi.Data;
 using SunCareApi.Models;
+using SunCareApi.Auth;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,7 +31,7 @@ builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
         {
             Status = StatusCodes.Status400BadRequest,
             Title = "Dữ liệu không hợp lệ.",
-            Detail = "Vui lòng kiểm tra tên bác sĩ và chuyên khoa.",
+            Detail = "Vui lòng kiểm tra các trường thông tin.",
             Instance = context.HttpContext.Request.Path
         };
         return new BadRequestObjectResult(problem)
@@ -39,6 +42,11 @@ builder.Services.AddControllers().ConfigureApiBehaviorOptions(options =>
 });
 
 builder.Services.AddProblemDetails();
+builder.Services.AddScoped<IPasswordHasher<AppUser>, PasswordHasher<AppUser>>();
+builder.Services.AddAuthentication(SessionAuthenticationHandler.SchemeName)
+    .AddScheme<AuthenticationSchemeOptions, SessionAuthenticationHandler>(
+        SessionAuthenticationHandler.SchemeName, _ => { });
+builder.Services.AddAuthorization();
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
     ?? ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:4173", "http://127.0.0.1:4173"];
@@ -51,21 +59,16 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-// Seed only on first creation. An intentionally empty list stays empty after restart.
 await using (var scope = app.Services.CreateAsyncScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<SunCareDbContext>();
-    if (await db.Database.EnsureCreatedAsync())
-    {
-        db.Doctors.AddRange(
-            new Doctor { Name = "Nguyễn Văn An", Specialty = "Tim mạch" },
-            new Doctor { Name = "Trần Thị Bình", Specialty = "Nội khoa" });
-        await db.SaveChangesAsync();
-    }
+    await DatabaseInitializer.InitializeAsync(db);
 }
 
 app.UseExceptionHandler();
 app.UseCors("React");
+app.UseAuthentication();
+app.UseAuthorization();
 app.MapControllers();
 
 app.Run();

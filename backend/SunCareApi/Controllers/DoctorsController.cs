@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using SunCareApi.Data;
 using SunCareApi.Models;
@@ -28,6 +29,7 @@ public class DoctorsController(SunCareDbContext db) : ControllerBase
     }
 
     [HttpPost]
+    [Authorize]
     public async Task<ActionResult<Doctor>> Create(DoctorRequest request, CancellationToken cancellationToken)
     {
         var doctor = new Doctor
@@ -42,6 +44,7 @@ public class DoctorsController(SunCareDbContext db) : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [Authorize]
     public async Task<ActionResult<Doctor>> Update(int id, DoctorRequest request, CancellationToken cancellationToken)
     {
         var doctor = await db.Doctors.SingleOrDefaultAsync(doctor => doctor.Id == id, cancellationToken);
@@ -66,6 +69,7 @@ public class DoctorsController(SunCareDbContext db) : ControllerBase
     }
 
     [HttpDelete("{id:int}")]
+    [Authorize]
     public async Task<IActionResult> Delete(int id, CancellationToken cancellationToken)
     {
         var deleted = await db.Doctors.Where(doctor => doctor.Id == id)

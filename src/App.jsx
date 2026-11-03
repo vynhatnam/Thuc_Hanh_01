@@ -1,6 +1,11 @@
 
 import { Routes, Route, NavLink, Link } from "react-router";
 import DoctorsPage from "./pages/DoctorsPage";
+import AuthPage from "./pages/AuthPage";
+import AccountPage from "./pages/AccountPage";
+import RequireAuth from "./auth/RequireAuth";
+import LogoutButton from "./auth/LogoutButton";
+import { useAuth } from "./auth/useAuth";
 
 // Trang chủ
 function Home() {
@@ -46,6 +51,7 @@ function Page({ title }) {
 }
 
 function App() {
+  const { user, status, retrySession, storageWarning } = useAuth();
   return (
     <>
       {/* Thanh menu */}
@@ -65,22 +71,26 @@ function App() {
 
         <div className="header-actions">
           <Link to="/booking">Đặt lịch ngay</Link>
-          <Link to="/login">Đăng nhập</Link>
-          <Link to="/register">Đăng ký</Link>
+          {user ? <><Link to="/account" className="account-link" title={user.email}>{user.email}</Link><LogoutButton /></>
+            : status === "checking" ? <span role="status">Đang kiểm tra phiên…</span>
+              : <><Link to="/login">Đăng nhập</Link><Link to="/register">Đăng ký</Link>
+                {status === "error" && <button className="button button-secondary" onClick={retrySession}>Kiểm tra lại phiên</button>}</>}
         </div>
       </header>
+      {storageWarning && <p className="feedback feedback-error" role="status">{storageWarning}</p>}
 
       {/* Cấu hình các trang */}
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/specialties" element={<Page title="Chuyên khoa" />} />
-        <Route path="/doctors" element={<DoctorsPage />} />
+        <Route path="/doctors" element={<DoctorsPage key={user?.id || "guest"} />} />
         <Route path="/about-us" element={<Page title="Giới thiệu" />} />
         <Route path="/faq" element={<Page title="Câu hỏi thường gặp" />} />
         <Route path="/contact" element={<Page title="Liên hệ" />} />
-        <Route path="/booking" element={<Page title="Đặt lịch khám" />} />
-        <Route path="/login" element={<Page title="Đăng nhập" />} />
-        <Route path="/register" element={<Page title="Đăng ký" />} />
+        <Route path="/booking" element={<RequireAuth><Page title="Đặt lịch khám" /></RequireAuth>} />
+        <Route path="/account" element={<RequireAuth><AccountPage /></RequireAuth>} />
+        <Route path="/login" element={<AuthPage key="login" mode="login" />} />
+        <Route path="/register" element={<AuthPage key="register" mode="register" />} />
         <Route path="*" element={<Page title="404 - Không tìm thấy trang" />} />
       </Routes>
     </>
